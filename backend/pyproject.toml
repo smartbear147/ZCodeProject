@@ -9,6 +9,7 @@ dependencies = [
   "zhipuai>=2.1.0",
   "sniffio>=1.3",
   "aliyun-python-sdk-core>=2.15.0",
+  "alibabacloud-nls-python-sdk>=1.0.2",
   "numpy>=1.26",
   "pydantic>=2.6",
   "pydantic-settings>=2.2",

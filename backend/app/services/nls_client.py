@@ -1,15 +1,23 @@
 """阿里云 NLS 实时语音识别会话封装。
 
-把 NLS SDK 的回调式 API 解耦成 on_partial / on_final 两个回调，
-方便上层（路由层）处理和测试。
+基于官方 SDK 的 nls.NlsSpeechTranscriber(实时语音识别)类。
+把 SDK 的多个回调式 API 解耦成 on_partial / on_final 两个回调,
+方便上层(路由层)处理和测试。
 
-设计要点：
-- _handle_message 是纯 JSON 解析+分发，可独立单测，不依赖 nls SDK。
-- start/send_pcm/stop 才接触真实 SDK；nls 采用延迟导入，避免测试时强依赖。
+参考文档:
+- 实时语音识别 SDK: https://help.aliyun.com/zh/isi/developer-reference/sdk-for-python-2
+- 获取 Token:       https://help.aliyun.com/zh/isi/getting-started/obtain-an-access-token
+
+设计要点:
+- _handle_message 是纯 JSON 解析+分发,可独立单测,不依赖 nls SDK。
+- start/send_pcm/stop 才接触真实 SDK;nls 采用延迟导入,避免测试时强依赖。
 """
 
 import json
 from typing import Callable
+
+# 官方文档指定的网关地址
+DEFAULT_URL = "wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1"
 
 
 class NlsAsrSession:
@@ -19,19 +27,19 @@ class NlsAsrSession:
         on_final: Callable[[str], None],
         app_key: str,
         token: str,
-        url: str = "wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1",
+        url: str = DEFAULT_URL,
     ) -> None:
         self._on_partial = on_partial
         self._on_final = on_final
         self._app_key = app_key
         self._token = token
         self._url = url
-        self._nls = None  # nls.NlsClient 实例，start 后才有
+        self._transcriber = None  # nls.NlsSpeechTranscriber 实例,start 后才有
 
     def _handle_message(self, message: str) -> None:
-        """解析 NLS 返回的 JSON 消息，分发到 partial/final 回调。
+        """解析 NLS 返回的 JSON 消息,分发到 partial/final 回调。
 
-        抽成独立方法便于单测（不依赖真实 SDK 连接）。
+        抽成独立方法便于单测(不依赖真实 SDK 连接)。
         """
         data = json.loads(message)
         name = data["header"]["name"]
@@ -42,41 +50,57 @@ class NlsAsrSession:
             self._on_partial(payload.get("result", ""))
         elif name == "SentenceEnd":
             self._on_final(payload.get("result", ""))
-        # 其它事件（TaskFailed 等）忽略
+        # 其它事件(RecognitionStarted / TranscriptionCompleted / TaskFailed 等)
+        # 在 _handle_message 层忽略;路由层若需可自行扩展。
 
-    def start(self, on_close: Callable[[], None] | None = None) -> None:
-        """建立 NLS 连接并开始转写。延迟导入 nls SDK。"""
-        import nls  # 延迟导入：测试只测 _handle_message 时无需装 SDK
+    def start(self, on_close: Callable[..., None] | None = None) -> None:
+        """建立 NLS 连接并开始转写。延迟导入 nls SDK。
 
-        def _cb(result, *_args):
-            # nls SDK 把 JSON 字符串传给 on_metainfo 回调
-            if isinstance(result, str):
-                self._handle_message(result)
+        SDK 各回调签名:第一个参数是消息(JSON 字符串)。
+        on_close 签名不同:只有 *args,没有消息。
+        """
+        import nls  # 延迟导入:测试只测 _handle_message 时无需 SDK 真实运行
 
-        self._nls = nls.NlsClient(
+        def _on_msg(message, *_args):
+            """通用消息回调:SDK 把 JSON 字符串作为第一个参数传入。"""
+            if isinstance(message, str):
+                self._handle_message(message)
+
+        self._transcriber = nls.NlsSpeechTranscriber(
             url=self._url,
             token=self._token,
-            on_metainfo=_cb,
-            on_close=on_close or (lambda: None),
-            on_open=lambda: None,
+            appkey=self._app_key,
+            on_start=_on_msg,
+            on_result_changed=_on_msg,
+            on_sentence_begin=_on_msg,
+            on_sentence_end=_on_msg,
+            on_completed=_on_msg,
+            on_error=_on_msg,
+            on_close=on_close or _noop,
+            callback_args=[],
         )
-        self._nls.start(
+        self._transcriber.start(
             aformat="pcm",
             sample_rate=16000,
             enable_intermediate_result=True,
             enable_punctuation_prediction=True,
-            app_key=self._app_key,
+            enable_inverse_text_normalization=True,
         )
 
     def send_pcm(self, pcm_bytes: bytes) -> None:
         """喂入一段 16k s16 PCM。"""
-        if self._nls is not None:
-            self._nls.send_audio(pcm_bytes)
+        if self._transcriber is not None:
+            self._transcriber.send_audio(pcm_bytes)
 
     def stop(self) -> None:
         """停止转写并关闭连接。"""
-        if self._nls is not None:
+        if self._transcriber is not None:
             try:
-                self._nls.stop()
+                self._transcriber.stop()
             finally:
-                self._nls = None
+                self._transcriber = None
+
+
+def _noop(*_args, **_kwargs) -> None:
+    """空回调:用于没有业务逻辑的 SDK 回调位。"""
+    pass
