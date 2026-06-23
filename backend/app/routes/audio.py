@@ -15,6 +15,7 @@ NLS SDK 的回调在独立线程触发，websocket 发送是协程，
 
 import asyncio
 import json
+import logging
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
@@ -25,6 +26,7 @@ from app.services.resampler import resample_to_16k_s16
 from app.services.session import SessionStore
 
 router = APIRouter()
+logger = logging.getLogger("audio_ws")
 
 
 @router.websocket("/ws/audio")
@@ -35,6 +37,7 @@ async def audio_ws(
     token_provider=Depends(get_token_provider),
 ) -> None:
     await websocket.accept()
+    logger.warning("ws connected")
 
     loop = asyncio.get_running_loop()
     session = None
@@ -50,16 +53,25 @@ async def audio_ws(
             try:
                 msg = await websocket.receive()
             except WebSocketDisconnect:
+                logger.warning("ws disconnected by client")
                 break
             # Starlette 可能把 disconnect 作为消息返回而非抛异常
             if msg.get("type") == "websocket.disconnect":
+                logger.warning("ws disconnect message")
                 break
             if "text" in msg:
                 data = json.loads(msg["text"])
                 if data.get("type") == "start":
                     sid = data.get("session_id")
                     session = store.get_or_create(sid) if sid else store.create()
-                    token = token_provider.get_token()
+                    try:
+                        token = token_provider.get_token()
+                        logger.warning("got token, len=%d, appkey=%s",
+                                       len(token), settings.aliyun_nls_app_key)
+                    except Exception as e:
+                        logger.exception("token fetch failed")
+                        _send({"type": "error", "message": f"token 获取失败: {e}"})
+                        continue
                     nls_session = NlsAsrSession(
                         on_partial=lambda t: _send({"type": "partial", "text": t}),
                         on_final=_make_on_final(session, store, _send),
@@ -70,7 +82,9 @@ async def audio_ws(
                     _send({"type": "ready", "session_id": session.session_id})
                     try:
                         nls_session.start()
+                        logger.warning("nls start() returned ok")
                     except Exception as e:  # ASR 启动失败
+                        logger.exception("nls start() raised")
                         _send({"type": "error", "message": f"ASR 启动失败: {e}"})
                         await websocket.close()
                         return
@@ -80,8 +94,15 @@ async def audio_ws(
                 pcm16 = resample_to_16k_s16(
                     msg["bytes"], in_rate=settings.input_sample_rate
                 )
-                nls_session.send_pcm(pcm16)
+                try:
+                    nls_session.send_pcm(pcm16)
+                except Exception as e:
+                    logger.exception("send_pcm failed")
+                    _send({"type": "error", "message": f"音频发送失败: {e}"})
+    except Exception:
+        logger.exception("audio_ws loop crashed")
     finally:
+        logger.warning("ws closing, stopping nls")
         if nls_session is not None:
             nls_session.stop()
 

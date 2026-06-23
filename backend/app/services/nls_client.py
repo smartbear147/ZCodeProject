@@ -14,7 +14,10 @@
 """
 
 import json
+import logging
 from typing import Callable
+
+logger = logging.getLogger("nls_client")
 
 # 官方文档指定的网关地址
 DEFAULT_URL = "wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1"
@@ -50,8 +53,13 @@ class NlsAsrSession:
             self._on_partial(payload.get("result", ""))
         elif name == "SentenceEnd":
             self._on_final(payload.get("result", ""))
-        # 其它事件(RecognitionStarted / TranscriptionCompleted / TaskFailed 等)
-        # 在 _handle_message 层忽略;路由层若需可自行扩展。
+        elif name == "TaskFailed":
+            logger.warning("NLS TaskFailed: %s", message)
+        elif name == "RecognitionStarted":
+            logger.warning("NLS RecognitionStarted (识别已开始)")
+        elif name == "TranscriptionCompleted":
+            logger.warning("NLS TranscriptionCompleted")
+        # 其它事件忽略
 
     def start(self, on_close: Callable[..., None] | None = None) -> None:
         """建立 NLS 连接并开始转写。延迟导入 nls SDK。
@@ -66,6 +74,16 @@ class NlsAsrSession:
             if isinstance(message, str):
                 self._handle_message(message)
 
+        def _on_close(*_args):
+            logger.warning("NLS on_close: 连接关闭")
+            if on_close:
+                on_close()
+
+        def _on_error(message, *_args):
+            logger.warning("NLS on_error 回调: %s", message)
+
+        logger.warning("creating NlsSpeechTranscriber, appkey=%s, token_len=%d",
+                       self._app_key, len(self._token))
         self._transcriber = nls.NlsSpeechTranscriber(
             url=self._url,
             token=self._token,
@@ -75,8 +93,8 @@ class NlsAsrSession:
             on_sentence_begin=_on_msg,
             on_sentence_end=_on_msg,
             on_completed=_on_msg,
-            on_error=_on_msg,
-            on_close=on_close or _noop,
+            on_error=_on_error,
+            on_close=_on_close,
             callback_args=[],
         )
         self._transcriber.start(
@@ -99,8 +117,3 @@ class NlsAsrSession:
                 self._transcriber.stop()
             finally:
                 self._transcriber = None
-
-
-def _noop(*_args, **_kwargs) -> None:
-    """空回调:用于没有业务逻辑的 SDK 回调位。"""
-    pass
