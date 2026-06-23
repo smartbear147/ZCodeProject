@@ -3,6 +3,10 @@ import { useCallback, useRef, useState } from 'react'
 /**
  * 采集系统音频（用户在授权弹窗里选 BlackHole 虚拟声卡），
  * 用 AudioWorklet 每 ~100ms 取一帧 float32 PCM，通过 onChunk 回调输出。
+ *
+ * 关键：AudioWorkletNode 必须最终连到 destination，否则浏览器认为这条
+ * 音频图没有消费者，会停止拉取数据（process() 不再被调用）。
+ * 这里用 gain=0 的 GainNode 接到 destination：保证数据流通，但不回放声音。
  */
 export function useAudioCapture(onChunk: (pcmBytes: ArrayBuffer) => void) {
   const [isCapturing, setIsCapturing] = useState(false)
@@ -35,8 +39,13 @@ export function useAudioCapture(onChunk: (pcmBytes: ArrayBuffer) => void) {
         onChunkRef.current(e.data as ArrayBuffer)
       }
       source.connect(node)
+      // 用静音 GainNode 接到 destination：保证音频图有消费者、process() 会跑，
+      // 同时不把声音回放出去（避免听到回声）。
+      const silentGain = ctx.createGain()
+      silentGain.gain.value = 0
+      node.connect(silentGain)
+      silentGain.connect(ctx.destination)
       nodeRef.current = node
-      // 故意不连到 destination：不把音频回放出去
       setIsCapturing(true)
     } catch (e) {
       setError(`音频采集失败：${(e as Error).message}`)
