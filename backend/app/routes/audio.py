@@ -90,10 +90,13 @@ async def audio_ws(
                         return
             elif "bytes" in msg:
                 if nls_session is None:
+                    logger.warning("收到音频帧但 nls_session 还没建立,丢弃")
                     continue  # 未 start，丢弃音频
                 pcm16 = resample_to_16k_s16(
                     msg["bytes"], in_rate=settings.input_sample_rate
                 )
+                logger.debug("收到音频帧: 输入 %d 字节 -> 重采样 %d 字节",
+                             len(msg["bytes"]), len(pcm16))
                 try:
                     nls_session.send_pcm(pcm16)
                 except Exception as e:
