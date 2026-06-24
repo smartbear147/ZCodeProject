@@ -1,30 +1,47 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { Controls } from './components/Controls'
 import { SubtitlePanel } from './components/SubtitlePanel'
 import { SuggestPanel } from './components/SuggestPanel'
 import { useAudioCapture } from './hooks/useAudioCapture'
 import { useChat } from './hooks/useChat'
+import { useDevices } from './hooks/useDevices'
 import { useSubtitle } from './hooks/useSubtitle'
 
 function App() {
   const subtitle = useSubtitle()
   const chat = useChat(subtitle.sessionId)
+  const { devices, refresh: refreshDevices } = useDevices()
+  const [selectedDeviceId, setSelectedDeviceId] = useState('')
 
   const handleChunk = useCallback(
     (buf: ArrayBuffer) => subtitle.sendAudio(buf),
     [subtitle],
   )
-  const { isCapturing, start, stop, error: captureError } =
-    useAudioCapture(handleChunk)
+  const { isCapturing, level, start, stop, error: captureError } =
+    useAudioCapture(handleChunk, selectedDeviceId)
 
   const onStart = async () => {
     subtitle.connect()
     await start()
+    // 授权后刷新设备列表，让下拉框显示真实设备名（VoiceMeeter Output 等）
+    refreshDevices()
   }
   const onStop = () => {
     stop()
     subtitle.close()
   }
+
+  // 切换设备：更新选中态；若正在采集，用新设备重连（显式传 id 绕过 setState 异步）
+  const onSelectDevice = useCallback(
+    async (deviceId: string) => {
+      setSelectedDeviceId(deviceId)
+      if (isCapturing) {
+        stop()
+        await start(deviceId)
+      }
+    },
+    [isCapturing, start, stop],
+  )
 
   // 生成建议：成功后清空左侧字幕（这轮的话已送走，开始新一轮），
   // 与后端 current_turn_text 清空保持一致。失败不清空，保留字幕方便重试。
@@ -44,6 +61,10 @@ function App() {
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Controls
         isCapturing={isCapturing}
+        level={level}
+        devices={devices}
+        selectedDeviceId={selectedDeviceId}
+        onSelectDevice={onSelectDevice}
         onStart={onStart}
         onStop={onStop}
         onSuggest={onSuggest}
