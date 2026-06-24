@@ -16,10 +16,10 @@ npm run dev
 
 ## 使用流程
 
-1. 按 [docs/SETUP.md](../docs/SETUP.md) 配好 BlackHole 虚拟声卡
+1. 按 [docs/SETUP.md](../docs/SETUP.md) 配好虚拟声卡（macOS：BlackHole；Windows：Voicemeeter）
 2. 启动后端 + 前端
 3. 进入腾讯会议（扬声器选"多输出设备"）
-4. 在前端点 **▶ 开始采集**，浏览器弹窗里选 **BlackHole 2ch**
+4. 在前端点 **▶ 开始采集**，在顶部「输入设备」下拉框选你的虚拟声卡（macOS：BlackHole 2ch；Windows：VoiceMeeter Output）
 5. 面试官提问时，左侧实时显示字幕
 6. 面试官问完后点 **✨ 生成建议**，右侧出现回答思路
 7. 在右侧追问框继续提问（流式回复）

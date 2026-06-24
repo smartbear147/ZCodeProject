@@ -1,7 +1,7 @@
 # 面试助手 后端
 
-把腾讯会议里面试官的话实时转写成文本，按按钮后用智谱 GLM 生成回答建议，并可追问。
-配合 `frontend/` 前端使用。
+把会议里面试官的话实时转写成文本，按按钮后用智谱 GLM 生成回答建议，并可追问。
+配合 `frontend/` 前端使用。支持 macOS（BlackHole）与 Windows（Voicemeeter），详见 `../docs/SETUP.md`。
 
 ## 安装
 
