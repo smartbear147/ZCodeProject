@@ -35,5 +35,21 @@ export function useSubtitle() {
     socketRef.current = null
   }, [])
 
-  return { lines, currentPartial, sessionId, error, connect, sendAudio, close }
+  // 清空当前轮次的字幕：生成建议后调用，让左侧字幕只显示"新一轮"的话，
+  // 与后端 current_turn_text 的清空保持一致（避免视觉上误以为是全量字幕）。
+  const clearLines = useCallback(() => {
+    setLines([])
+    setCurrentPartial('')
+  }, [])
+
+  return {
+    lines,
+    currentPartial,
+    sessionId,
+    error,
+    connect,
+    sendAudio,
+    close,
+    clearLines,
+  }
 }

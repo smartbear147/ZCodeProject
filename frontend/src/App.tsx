@@ -26,14 +26,28 @@ function App() {
     subtitle.close()
   }
 
+  // 生成建议：成功后清空左侧字幕（这轮的话已送走，开始新一轮），
+  // 与后端 current_turn_text 清空保持一致。失败不清空，保留字幕方便重试。
+  const onSuggest = useCallback(async () => {
+    const ok = await chat.generate()
+    if (ok) {
+      subtitle.clearLines()
+    }
+  }, [chat, subtitle])
+
+  const onClear = useCallback(async () => {
+    await chat.clear()
+    subtitle.clearLines()
+  }, [chat, subtitle])
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Controls
         isCapturing={isCapturing}
         onStart={onStart}
         onStop={onStop}
-        onSuggest={chat.generate}
-        onClear={chat.clear}
+        onSuggest={onSuggest}
+        onClear={onClear}
       />
       {(captureError || subtitle.error) && (
         <div style={{ padding: '6px 12px', background: '#fff3f3', color: '#c00' }}>

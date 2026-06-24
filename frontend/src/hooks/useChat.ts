@@ -12,16 +12,18 @@ export function useChat(sessionId: string) {
   const [followups, setFollowups] = useState<ChatMessage[]>([])
   const [error, setError] = useState('')
 
-  const generate = useCallback(async () => {
-    if (!sessionId) return
+  const generate = useCallback(async (): Promise<boolean> => {
+    if (!sessionId) return false
     setLoading(true)
     setError('')
     setSuggestion('')
     try {
       const res = await postSuggest(sessionId)
       setSuggestion(res.suggestion)
+      return true
     } catch (e) {
       setError((e as Error).message)
+      return false
     } finally {
       setLoading(false)
     }
