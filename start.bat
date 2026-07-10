@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 chcp 65001 >nul
 cd /d "%~dp0"
 
@@ -28,10 +28,20 @@ exit /b
 :backend
 cd backend
 if not exist ".venv\Scripts\activate.bat" (
+    python --version 2>nul || (echo [错误] 未找到 Python，请先安装 Python 3.11+ ^& pause ^& exit /b 1)
     echo [后端] 首次运行：创建虚拟环境并安装依赖（可能需要几分钟）...
     python -m venv .venv
     call ".venv\Scripts\activate.bat"
     pip install -e ".[dev]"
+)
+if not exist ".env" (
+    if exist ".env.example" (
+        copy .env.example .env >nul
+        echo [后端] 已从 .env.example 创建 .env，请编辑 backend/.env 填入你的 API 密钥后再重启。
+        echo [后端] 按任意键退出...
+        pause >nul
+        exit /b 1
+    )
 )
 call ".venv\Scripts\activate.bat"
 echo [后端] 启动 uvicorn...
@@ -43,6 +53,7 @@ exit /b
 
 :frontend
 cd frontend
+node --version 2>nul || (echo [错误] 未找到 Node.js，请先安装 Node.js ^& pause ^& exit /b 1)
 if not exist "node_modules\.package-lock.json" (
     echo [前端] 首次运行：安装依赖...
     call npm install

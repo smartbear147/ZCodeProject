@@ -8,7 +8,7 @@
 - **实时语音转写**：阿里云 NLS 流式识别，支持 partial/final 结果
 - **智能回答**：基于简历和题库生成第一人称、可直接复述的完整答案
 - **流式对话**：支持继续追问获得更详细建议
-- **多会话管理**：像 ChatGPT 那样的侧边栏，支持新建/切换/删除会话，会话和对话历史重启不丢
+- **多会话管理**：像 ChatGPT 的侧边栏，支持新建/切换/删除会话，对话历史重启不丢
 - **文档管理**：上传 PDF 简历和 Markdown 面试题库，回答时自动参考真实经历
 - **多 LLM 支持**：智谱 GLM、DeepSeek、小米 MiMo、本地 Ollama 等任意 OpenAI 兼容 API
 
@@ -22,7 +22,6 @@ cp .env.example .env
 ```
 
 编辑 `.env` 填入密钥：
-
 ```ini
 # 阿里云 NLS（语音识别）
 ALIYUN_ACCESS_KEY_ID=你的AccessKey ID
@@ -38,7 +37,7 @@ LLM_MODEL=glm-4-plus
 
 ### 2. 安装虚拟声卡
 
-- **Windows**：[Voicemeeter](https://vb-audio.com/Voicemeeter/)，安装后重启电脑，系统播放设备设为"VoiceMeeter Input"，Voicemeeter HARDWARE OUT A1 选扬声器/耳机
+- **Windows**：[Voicemeeter](https://vb-audio.com/Voicemeeter/)，安装后重启电脑，系统播放设备设为 "VoiceMeeter Input"，Voicemeeter HARDWARE OUT A1 选扬声器/耳机
 - **macOS**：[BlackHole](https://existential.audio/blackhole/)，安装后创建"多输出设备"（BlackHole + 扬声器）
 
 ### 3. 一键启动
@@ -73,6 +72,7 @@ npm run dev
 4. 点 **发送字幕**，右侧出现可直接念出的回答
 5. 可在右侧对话框继续追问
 6. 点 **📁 管理** 上传简历和题库，让回答更贴近真实经历
+7. 左侧会话列表可新建/切换/删除会话，重启后历史不丢
 
 ## 项目结构
 

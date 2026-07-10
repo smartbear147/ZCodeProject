@@ -13,6 +13,27 @@ cleanup() {
 }
 trap cleanup INT TERM
 
+# ---------- 前置检查 ----------
+if ! command -v python3 &>/dev/null; then
+  echo "[错误] 未找到 python3，请先安装 Python 3.11+"
+  exit 1
+fi
+if ! command -v node &>/dev/null; then
+  echo "[错误] 未找到 node，请先安装 Node.js"
+  exit 1
+fi
+
+# ---------- .env 检查 ----------
+cd backend
+if [ ! -f ".env" ]; then
+  if [ -f ".env.example" ]; then
+    cp .env.example .env
+    echo "[后端] 已从 .env.example 创建 .env，请编辑 backend/.env 填入你的 API 密钥后再重启。"
+    exit 1
+  fi
+fi
+cd ..
+
 # ---------- 后端 ----------
 (
   cd backend
@@ -42,7 +63,7 @@ trap cleanup INT TERM
 
 echo ""
 echo "============================================"
-echo "  面试助手 - 启动中"
+echo "  面试助手 - 已启动"
 echo "============================================"
 echo "  后端: http://localhost:8000  (健康检查 /health)"
 echo "  前端: http://localhost:5173  <- 浏览器访问这个"
