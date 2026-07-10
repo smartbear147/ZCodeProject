@@ -1,26 +1,34 @@
-"""依赖注入：全局单例服务。
-
-用 lru_cache 保证进程内单例。测试时可通过 app.dependency_overrides 覆盖。
-"""
+"""依赖注入：全局单例服务。"""
 
 from fastapi import Depends
 
 from app.config import Settings, get_settings
-from app.services.llm import LlmClient
-from app.services.session import SessionStore
-from app.services.suggest import SuggestService
+from app.services.chat_service import ChatService
+from app.services.document_store import DEFAULT_PATH as DOC_PATH, DocumentStore
+from app.services.llm import LlmClient  # noqa: F401
+from app.services.session import DEFAULT_PATH as SESSION_PATH, SessionStore
 from app.services.token_provider import NlsTokenProvider
 
-# 进程级单例：会话存储本身无配置依赖，直接复用。
-_session_store_singleton = SessionStore()
+# 进程级单例：会话存储，落盘到 data/sessions.json，重启不丢。
+_session_store_singleton = SessionStore(path=SESSION_PATH)
+# 进程级单例：文档存储（简历/题库），落盘到 data/documents.json，重启不丢。
+_document_store_singleton = DocumentStore(path=DOC_PATH)
 
 
 def get_session_store() -> SessionStore:
     return _session_store_singleton
 
 
+def get_document_store() -> DocumentStore:
+    return _document_store_singleton
+
+
 def get_llm(settings: Settings = Depends(get_settings)) -> LlmClient:
-    return LlmClient(api_key=settings.zhipu_api_key, model=settings.zhipu_model)
+    return LlmClient(
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
+        model=settings.llm_model,
+    )
 
 
 def get_token_provider(
@@ -33,8 +41,9 @@ def get_token_provider(
     )
 
 
-def get_suggest_service(
+def get_chat_service(
     settings: Settings = Depends(get_settings),
     store: SessionStore = Depends(get_session_store),
-) -> SuggestService:
-    return SuggestService(llm=get_llm(settings), store=store)
+    doc_store: DocumentStore = Depends(get_document_store),
+) -> ChatService:
+    return ChatService(llm=get_llm(settings), store=store, doc_store=doc_store)

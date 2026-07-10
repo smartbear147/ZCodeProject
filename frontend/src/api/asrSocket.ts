@@ -13,14 +13,17 @@ export class AsrSocket {
 
   constructor(private readonly cb: AsrCallbacks) {}
 
-  connect(): void {
+  /** 连接后端 /ws/audio。sessionId 非空时复用该会话（字幕进同一会话）。 */
+  connect(sessionId?: string): void {
     // 用相对路径，Vite dev 代理到 ws://localhost:8000
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const ws = new WebSocket(`${proto}//${location.host}/ws/audio`)
     ws.binaryType = 'arraybuffer'
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'start' }))
+      const payload: Record<string, unknown> = { type: 'start' }
+      if (sessionId) payload.session_id = sessionId
+      ws.send(JSON.stringify(payload))
     }
     ws.onmessage = (e) => {
       try {

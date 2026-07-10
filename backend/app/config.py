@@ -10,9 +10,10 @@ class Settings(BaseSettings):
     aliyun_nls_app_key: str = ""
     aliyun_nls_region: str = "cn-shanghai"
 
-    # 智谱 GLM
-    zhipu_api_key: str = ""
-    zhipu_model: str = "glm-4-plus"
+    # LLM（OpenAI 兼容接口，适用于智谱/小米 MiMo/DeepSeek/本地 Ollama 等）
+    llm_api_key: str = ""
+    llm_base_url: str = "https://open.bigmodel.cn/api/paas/v4"
+    llm_model: str = "glm-4-plus"
 
     # 音频
     input_sample_rate: int = 48000

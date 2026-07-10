@@ -1,14 +1,18 @@
-"""智谱 GLM 封装：同步生成 + 流式生成。"""
+"""通用 LLM 客户端（OpenAI 兼容接口）。
+
+适用于任何 OpenAI 兼容的 API：智谱 GLM、小米 MiMo、DeepSeek、本地 Ollama 等。
+只需在 .env 中配置 LLM_BASE_URL、LLM_API_KEY、LLM_MODEL 即可切换。
+"""
 
 from typing import Iterator, List
 
-from zhipuai import ZhipuAI
+from openai import OpenAI
 
 
 class LlmClient:
-    def __init__(self, api_key: str, model: str) -> None:
+    def __init__(self, api_key: str, base_url: str, model: str) -> None:
         self._model = model
-        self._client = ZhipuAI(api_key=api_key)
+        self._client = OpenAI(api_key=api_key, base_url=base_url)
 
     def generate(self, messages: List[dict]) -> str:
         """同步生成，返回完整文本。"""

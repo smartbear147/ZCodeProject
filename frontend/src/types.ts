@@ -3,13 +3,14 @@ export interface SubtitleLine {
   isFinal: boolean;
 }
 
-export interface SuggestResult {
-  sessionId: string;
-  suggestion: string;
-  question: string;
-}
-
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+}
+
+export interface DocumentInfo {
+  id: string;
+  filename: string;
+  doc_type: 'resume' | 'qa';
+  size_bytes: number;
 }

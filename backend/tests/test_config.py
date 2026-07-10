@@ -3,7 +3,7 @@ from app.config import get_settings
 
 def test_default_model_is_glm_4_plus():
     s = get_settings()
-    assert s.zhipu_model == "glm-4-plus"
+    assert s.llm_model == "glm-4-plus"
 
 
 def test_default_sample_rates():

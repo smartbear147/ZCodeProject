@@ -1,4 +1,4 @@
-"""音频 + 字幕 WebSocket 路由。
+﻿"""音频 + 字幕 WebSocket 路由。
 
 协议：
 - 前端首帧（文本）: {"type":"start","session_id":"<可选>"}
@@ -37,11 +37,14 @@ async def audio_ws(
     token_provider=Depends(get_token_provider),
 ) -> None:
     await websocket.accept()
-    logger.warning("ws connected")
+    logger.info("ws connected")
 
     loop = asyncio.get_running_loop()
     session = None
     nls_session: NlsAsrSession | None = None
+
+    # 标记 ASR 是否已主动断开，避免 finally 里重复 stop()
+    nls_closed = False
 
     def _send(payload: dict) -> None:
         """从任意线程把 JSON 消息调度到事件循环发送给前端。"""
@@ -53,11 +56,11 @@ async def audio_ws(
             try:
                 msg = await websocket.receive()
             except WebSocketDisconnect:
-                logger.warning("ws disconnected by client")
+                logger.info("ws disconnected by client")
                 break
             # Starlette 可能把 disconnect 作为消息返回而非抛异常
             if msg.get("type") == "websocket.disconnect":
-                logger.warning("ws disconnect message")
+                logger.info("ws disconnect message")
                 break
             if "text" in msg:
                 data = json.loads(msg["text"])
@@ -66,8 +69,8 @@ async def audio_ws(
                     session = store.get_or_create(sid) if sid else store.create()
                     try:
                         token = token_provider.get_token()
-                        logger.warning("got token, len=%d, appkey=%s",
-                                       len(token), settings.aliyun_nls_app_key)
+                        logger.info("got token, len=%d, appkey=%s",
+                                    len(token), settings.aliyun_nls_app_key)
                     except Exception as e:
                         logger.exception("token fetch failed")
                         _send({"type": "error", "message": f"token 获取失败: {e}"})
@@ -81,8 +84,29 @@ async def audio_ws(
                     # 先通知前端就绪，再启动 ASR（避免 NLS 回调早于 ready 触发）
                     _send({"type": "ready", "session_id": session.session_id})
                     try:
-                        nls_session.start()
-                        logger.warning("nls start() returned ok")
+                        def _on_nls_close() -> None:
+                            """NLS 服务端主动断开时自动重连（对用户透明）。"""
+                            nonlocal nls_closed, nls_session
+                            nls_closed = True
+                            logger.warning("NLS 连接已断开，尝试自动重连")
+                            try:
+                                new_token = token_provider.get_token()
+                                new_nls = NlsAsrSession(
+                                    on_partial=lambda t: _send({"type": "partial", "text": t}),
+                                    on_final=_make_on_final(session, store, _send),
+                                    app_key=settings.aliyun_nls_app_key,
+                                    token=new_token,
+                                )
+                                new_nls.start(on_close=_on_nls_close)
+                                nls_session = new_nls
+                                nls_closed = False
+                                logger.info("NLS 自动重连成功")
+                            except Exception as re:
+                                logger.exception("NLS 自动重连失败")
+                                _send({"type": "error", "message": "ASR 连接已断开，请重新开始采集"})
+
+                        nls_session.start(on_close=_on_nls_close)
+                        logger.info("nls start() returned ok")
                     except Exception as e:  # ASR 启动失败
                         logger.exception("nls start() raised")
                         _send({"type": "error", "message": f"ASR 启动失败: {e}"})
@@ -90,12 +114,12 @@ async def audio_ws(
                         return
             elif "bytes" in msg:
                 if nls_session is None:
-                    logger.warning("收到音频帧但 nls_session 还没建立,丢弃")
-                    continue  # 未 start，丢弃音频
+                    logger.info("收到音频帧但 nls_session 还没建立,丢弃")
+                    continue  # 没 start，丢弃音频
                 pcm16 = resample_to_16k_s16(
                     msg["bytes"], in_rate=settings.input_sample_rate
                 )
-                logger.debug("收到音频帧: 输入 %d 字节 -> 重采样 %d 字节",
+                logger.debug("收到音频帧 输入 %d 字节 -> 重采样 %d 字节",
                              len(msg["bytes"]), len(pcm16))
                 try:
                     nls_session.send_pcm(pcm16)
@@ -105,18 +129,19 @@ async def audio_ws(
     except Exception:
         logger.exception("audio_ws loop crashed")
     finally:
-        logger.warning("ws closing, stopping nls")
-        if nls_session is not None:
+        logger.info("ws closing, stopping nls")
+        if nls_session is not None and not nls_closed:
             nls_session.stop()
 
 
 def _make_on_final(session, store: SessionStore, send_fn):
-    """构造 final 回调：累积到 session 并推给前端。"""
+    """构造 final 回调：累积到 session 并推送给前端。"""
 
     def on_final(text: str) -> None:
         if session is None:
             return
-        session.append_final(text)
+        session.add_subtitle(text)
+        store.save(session.session_id)  # 字幕更新落盘
         send_fn(
             {"type": "final", "text": text, "session_id": session.session_id}
         )

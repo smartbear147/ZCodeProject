@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import type { AudioInputDevice } from '../hooks/useDevices'
 
 interface Props {
@@ -8,8 +9,8 @@ interface Props {
   onSelectDevice: (deviceId: string) => void
   onStart: () => void
   onStop: () => void
-  onSuggest: () => void
-  onClear: () => void
+  sidebarCollapsed: boolean
+  onToggleSidebar: () => void
 }
 
 export function Controls({
@@ -20,67 +21,63 @@ export function Controls({
   onSelectDevice,
   onStart,
   onStop,
-  onSuggest,
-  onClear,
+  sidebarCollapsed,
+  onToggleSidebar,
 }: Props) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 8,
-        padding: 12,
-        borderBottom: '1px solid #e0e0e0',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-      }}
-    >
-      <strong style={{ marginRight: 'auto' }}>面试助手</strong>
-
-      <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        输入设备
-        <select
-          value={selectedDeviceId}
-          onChange={(e) => onSelectDevice(e.target.value)}
-          style={{ maxWidth: 220 }}
-          title="选择虚拟声卡：macOS 选 BlackHole；Windows 选 VoiceMeeter Output"
-        >
-          <option value="">（默认 / 未选择）</option>
-          {devices.map((d) => (
-            <option key={d.deviceId} value={d.deviceId}>
-              {d.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {/* 实时输入电平：宽度随 level 变化；静音灰、有声绿 */}
-      <div
-        title="实时输入电平（无声时检查是否抓错了真实麦克风）"
-        style={{
-          width: 120,
-          height: 8,
-          background: '#e0e0e0',
-          borderRadius: 4,
-          overflow: 'hidden',
-        }}
+    <header className="topbar">
+      <button
+        type="button"
+        className="sidebar-toggle"
+        onClick={onToggleSidebar}
+        aria-label={sidebarCollapsed ? '展开会话列表' : '收起会话列表'}
+        title={sidebarCollapsed ? '展开会话列表' : '收起会话列表'}
       >
-        <div
-          style={{
-            width: `${level}%`,
-            height: '100%',
-            background: level > 2 ? '#4caf50' : '#bbb',
-            transition: 'width 80ms linear',
-          }}
-        />
+        {sidebarCollapsed ? '☰' : '✕'}
+      </button>
+      <div className="brand">
+        <span className="brand-icon" aria-hidden="true">✓</span>
+        <strong>面试助手</strong>
       </div>
-
+      <select
+        className="device-select"
+        aria-label="输入设备"
+        value={selectedDeviceId}
+        onChange={(e) => onSelectDevice(e.target.value)}
+      >
+        <option value="">默认设备</option>
+        {devices.map((d) => (
+          <option key={d.deviceId} value={d.deviceId}>
+            {d.label}
+          </option>
+        ))}
+      </select>
+      <div
+        className="level-meter"
+        role="meter"
+        aria-label="输入音量"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={level}
+      >
+        <div className="level-meter-fill" style={{ width: `${level}%` }} />
+      </div>
+      <div
+        className={`capture-status ${isCapturing ? 'is-active' : ''}`}
+        role="status"
+        aria-live="polite"
+      >
+        <span aria-hidden="true" className="status-dot" />
+        {isCapturing ? '正在采集' : '等待采集'}
+      </div>
       {isCapturing ? (
-        <button onClick={onStop}>⏹ 停止采集</button>
+        <button className="primary-control" onClick={onStop}>⏹ 停止采集</button>
       ) : (
-        <button onClick={onStart}>▶ 开始采集</button>
+        <button className="primary-control" onClick={onStart}>▶ 开始采集</button>
       )}
-      <button onClick={onSuggest}>✨ 生成建议</button>
-      <button onClick={onClear}>🗑 清空上下文</button>
-    </div>
+      <Link to="/manage" className="secondary-control manage-btn">
+        📁 管理
+      </Link>
+    </header>
   )
 }

@@ -70,8 +70,8 @@ def test_audio_ws_creates_session_and_streams_final():
             assert final_msg["type"] == "final"
             assert final_msg["text"] == "你好面试官"
             assert final_msg["session_id"] == sid
-            # final 应已累积到 session
-            assert store.get(sid).current_turn_text == "你好面试官"
+            # final 应已累积到 session 的字幕区
+            assert store.get(sid).subtitle_text == "你好面试官"
 
     app.dependency_overrides.clear()
 

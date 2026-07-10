@@ -1,6 +1,6 @@
 """生成建议业务：组装 prompt，调 LLM，结转轮次。"""
 
-from typing import List
+from typing import Iterator, List
 
 from app.prompts import SYSTEM_PROMPT
 from app.services.llm import LlmClient
@@ -34,3 +34,15 @@ class SuggestService:
         suggestion = self._llm.generate(messages)
         session.finalize_turn(suggestion=suggestion)
         return suggestion
+
+    def suggest_stream(self, session_id: str) -> Iterator[str]:
+        """流式生成建议。逐 token 产出文本片段，流结束后结转轮次。"""
+        session = self._store.get(session_id)
+        if session is None:
+            raise KeyError(f"session not found: {session_id}")
+        messages = self.build_messages(session)
+        full_text = ""
+        for delta in self._llm.stream(messages):
+            full_text += delta
+            yield delta
+        session.finalize_turn(suggestion=full_text)

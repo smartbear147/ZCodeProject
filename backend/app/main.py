@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.DEBUG, format="%(levelname)s %(name)s: %(messa
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import audio, chat
+from app.routes import audio, chat, documents
 
 app = FastAPI(title="Interview Assistant")
 
@@ -29,3 +29,4 @@ async def health() -> dict:
 
 app.include_router(audio.router)
 app.include_router(chat.router)
+app.include_router(documents.router)
