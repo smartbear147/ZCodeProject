@@ -11,13 +11,13 @@ echo ============================================
 echo.
 
 echo 正在启动后端与前端（首次运行需安装依赖，请耐心等待）...
-start "面试助手-后端 (port 8000)" "%~f0" backend
-start "面试助手-前端 (port 5173)" "%~f0" frontend
+start "backend" cmd /c ""%~f0" backend"
+start "frontend" cmd /c ""%~f0" frontend"
 
 echo.
 echo 已在新窗口启动：
-echo   后端: http://localhost:8000  (健康检查 /health)
-echo   前端: http://localhost:5173  ^<- 浏览器访问这个
+echo   后端: http://localhost:8000
+echo   前端: http://localhost:5173
 echo.
 echo 关闭弹出的两个窗口即可停止服务。
 echo.
