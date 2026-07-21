@@ -17,9 +17,13 @@ cp .env.example .env   # 填入阿里云 + LLM 的 key
 
 | 变量 | 说明 |
 |------|------|
-| `ALIYUN_ACCESS_KEY_ID` / `ALIYUN_ACCESS_KEY_SECRET` | 阿里云主账号 RAM 密钥（需开通"智能语音交互 NLS"） |
+| `ASR_PROVIDER` | 语音识别引擎：`aliyun`（NLS 流式，默认）/ `mimo`（小米 MiMo 分块转写） |
+| `ALIYUN_ACCESS_KEY_ID` / `ALIYUN_ACCESS_KEY_SECRET` | 阿里云主账号 RAM 密钥（`aliyun` 引擎必填，需开通"智能语音交互 NLS"） |
 | `ALIYUN_NLS_APP_KEY` | NLS 项目的 AppKey（在 NLS 控制台创建实时语音识别项目后获得） |
 | `ALIYUN_NLS_REGION` | 默认 `cn-shanghai`，NLS 实时识别目前仅上海可用 |
+| `MIMO_API_KEY` | 小米 MiMo API Key（`mimo` 引擎必填） |
+| `MIMO_ASR_MODEL` / `MIMO_ASR_BASE_URL` | 默认 `mimo-v2.5-asr` / `https://api.xiaomimimo.com/v1` |
+| `MIMO_ASR_CHUNK_SECONDS` | 分块转写时长（秒），默认 4.0，直接决定 MiMo 字幕延迟与粒度 |
 | `LLM_API_KEY` | LLM API Key（智谱/DeepSeek/小米 MiMo/Ollama 等） |
 | `LLM_BASE_URL` | OpenAI 兼容接口地址，默认 `https://open.bigmodel.cn/api/paas/v4` |
 | `LLM_MODEL` | 模型名，默认 `glm-4-plus`，可改为 `deepseek-chat`、`mimo-pro` 等 |
@@ -66,7 +70,9 @@ pytest tests/test_session.py::test_name -v
 浏览器音频(48k float32) ──WS──▶ routes/audio.py
                                   │ resampler 48k→16k s16
                                   ▼
-                          services/nls_client.py ──WS──▶ 阿里云 NLS
+              services/asr_base.py 接口（按 ASR_PROVIDER 二选一）
+                ├─ services/nls_client.py ──WS──▶ 阿里云 NLS（流式）
+                └─ services/mimo_asr.py ──HTTP──▶ 小米 MiMo（分块转写）
                                   │ partial/final
                                   ▼
                           services/session.py (字幕暂存区 subtitle_lines)

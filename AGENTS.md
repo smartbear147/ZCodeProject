@@ -8,7 +8,7 @@
 
 **功能：**
 - 实时音频捕获：通过浏览器 `getUserMedia` + AudioWorklet 捕获系统音频（需虚拟声卡）
-- 实时语音转写：阿里云 NLS 流式识别，支持 partial/final 结果
+- 实时语音转写：阿里云 NLS 流式识别（默认），可选小米 MiMo 分块转写（`ASR_PROVIDER` 切换），均输出 partial/final 结果
 - 智能回答：基于简历和题库上下文，生成第一人称、可直接复述的完整答案
 - 流式对话：支持继续追问获得更详细建议
 - 多会话管理：像 ChatGPT 的侧边栏，支持新建/切换/删除/重命名会话，历史重启不丢
@@ -24,11 +24,9 @@
 
 ### 必需的 API 密钥
 
-1. **阿里云 NLS**（语音识别）：
-   - 注册阿里云账号并开通"智能语音交互"服务
-   - 在 RAM 访问控制创建 AccessKey（ID 和 Secret）
-   - 在 NLS 控制台创建"实时语音识别"项目获取 AppKey
-   - 区域选择"上海"（当前唯一可用区域）
+1. **语音识别**（二选一，`ASR_PROVIDER` 切换，默认 aliyun）：
+   - **阿里云 NLS**：注册阿里云账号并开通"智能语音交互"服务；在 RAM 访问控制创建 AccessKey（ID 和 Secret）；在 NLS 控制台创建"实时语音识别"项目获取 AppKey；区域选择"上海"（当前唯一可用区域）
+   - **小米 MiMo ASR**：只需 `MIMO_API_KEY`（https://mimo.xiaomi.com/），OpenAI 兼容分块转写，延迟高于 NLS
 
 2. **LLM**（大语言模型，OpenAI 兼容接口）：
    - 智谱 GLM：https://open.bigmodel.cn/
@@ -46,11 +44,17 @@ cp .env.example .env
 
 编辑 `.env` 文件填入密钥：
 ```ini
+# 语音识别引擎：aliyun（默认）/ mimo（后者只需 MIMO_API_KEY）
+ASR_PROVIDER=aliyun
+
 # 阿里云 NLS
 ALIYUN_ACCESS_KEY_ID=你的AccessKey ID
 ALIYUN_ACCESS_KEY_SECRET=你的AccessKey Secret
 ALIYUN_NLS_APP_KEY=你的NLS AppKey
 ALIYUN_NLS_REGION=cn-shanghai
+
+# 小米 MiMo ASR（ASR_PROVIDER=mimo 时必填）
+MIMO_API_KEY=你的MiMo API Key
 
 # LLM（OpenAI 兼容接口）
 LLM_API_KEY=你的API Key
@@ -153,7 +157,9 @@ npm run dev
   ──WebSocket /ws/audio──▶ routes/audio.py
                               │ resample_to_16k_s16（numpy，不是 audioop）
                               ▼
-                        services/nls_client.py ──NLS WS──▶ 阿里云 NLS
+              services/asr_base.py 统一接口（deps.get_asr_factory 按 ASR_PROVIDER 二选一）
+                ├─ services/nls_client.py ──NLS WS──▶ 阿里云 NLS（流式）
+                └─ services/mimo_asr.py ──HTTP──▶ 小米 MiMo（分块转写）
                               │ partial/final 回调
                               ▼
                         services/session.py（subtitle_lines 字幕暂存区）

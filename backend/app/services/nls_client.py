@@ -31,9 +31,11 @@ class NlsAsrSession:
         app_key: str,
         token: str,
         url: str = DEFAULT_URL,
+        on_error: Callable[[str], None] | None = None,
     ) -> None:
         self._on_partial = on_partial
         self._on_final = on_final
+        self._on_error = on_error
         self._app_key = app_key
         self._token = token
         self._url = url
@@ -55,6 +57,10 @@ class NlsAsrSession:
             self._on_final(payload.get("result", ""))
         elif name == "TaskFailed":
             logger.warning("NLS TaskFailed: %s", message)
+            # SDK 的 on_error 回调不可靠，TaskFailed 是服务端明确送达的失败，通知前端
+            if self._on_error is not None:
+                reason = data["header"].get("status_text", "未知错误")
+                self._on_error(f"NLS 识别失败: {reason}")
         elif name == "RecognitionStarted":
             logger.warning("NLS RecognitionStarted (识别已开始)")
         elif name == "TranscriptionCompleted":

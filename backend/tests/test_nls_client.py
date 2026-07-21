@@ -57,6 +57,41 @@ def test_unknown_event_is_ignored():
     cb.on_final.assert_not_called()
 
 
+def test_task_failed_notifies_on_error():
+    """TaskFailed 是 NLS 服务端明确送达的失败（SDK on_error 不可靠），应通知前端。"""
+    cb = MagicMock()
+    session = NlsAsrSession(
+        on_partial=cb.on_partial,
+        on_final=cb.on_final,
+        app_key="ak",
+        token="T",
+        on_error=cb.on_error,
+    )
+    msg = (
+        '{"header":{"name":"TaskFailed","status":40000000,'
+        '"status_text":"Gateway:TOO_MANY_REQUESTS:Too many requests!"},"payload":{}}'
+    )
+    session._handle_message(msg)
+    cb.on_error.assert_called_once()
+    assert "TOO_MANY_REQUESTS" in cb.on_error.call_args[0][0]
+    cb.on_final.assert_not_called()
+
+
+def test_task_failed_without_status_text_uses_default():
+    """无 status_text 时 on_error 用默认文案，不抛异常。"""
+    cb = MagicMock()
+    session = NlsAsrSession(
+        on_partial=cb.on_partial,
+        on_final=cb.on_final,
+        app_key="ak",
+        token="T",
+        on_error=cb.on_error,
+    )
+    session._handle_message('{"header":{"name":"TaskFailed","status":40000000},"payload":{}}')
+    cb.on_error.assert_called_once()
+    assert "未知错误" in cb.on_error.call_args[0][0]
+
+
 def test_missing_payload_does_not_crash():
     session, cb = _make_session()
     msg = '{"header":{"name":"TranscriptionResultChanged","status":20000000}}'

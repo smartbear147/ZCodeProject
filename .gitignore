@@ -15,6 +15,9 @@ dist/
 # Runtime data
 backend/data/
 
+# 临时/调试产物
+tmp/
+
 # Node
 node_modules/
 *.tsbuildinfo
